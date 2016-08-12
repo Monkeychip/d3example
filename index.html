@@ -1,0 +1,217 @@
+
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8">
+        <title>D3: Loading GeoJSON data and generating SVG paths</title>
+        <script type="text/javascript" src="d3/d3.js"></script>
+        <style type="text/css">
+            <style>
+            body {
+                position: absolute;
+                font-family: "Proxima Nova", "Montserrat", sans-serif;
+            }
+            h1, h2 {
+                position: absolute;
+                left: 10px;
+                font-size: 1.3em;
+                font-weight: 100;
+            }
+            h2 {
+              
+                font-size: 1em;
+                color:black;
+            }
+            /* Remove .incident fill CSS */
+
+            .btn {
+              background: #3498db;
+              background-image: -webkit-linear-gradient(top, #3498db, #2980b9);
+              background-image: -moz-linear-gradient(top, #3498db, #2980b9);
+              background-image: -ms-linear-gradient(top, #3498db, #2980b9);
+              background-image: -o-linear-gradient(top, #3498db, #2980b9);
+              background-image: linear-gradient(to bottom, #3498db, #2980b9);
+              -webkit-border-radius: 28;
+              -moz-border-radius: 28;
+              border-radius: 28px;
+              font-family: Arial;
+              color: #ffffff;
+              font-size: 20px;
+              padding: 10px 20px 10px 20px;
+              text-decoration: none;
+              margin-bottom:10px;
+              border: none !important;
+            }
+
+            .btn:hover {
+              background: #3cb0fd;
+              background-image: -webkit-linear-gradient(top, #3cb0fd, #3498db);
+              background-image: -moz-linear-gradient(top, #3cb0fd, #3498db);
+              background-image: -ms-linear-gradient(top, #3cb0fd, #3498db);
+              background-image: -o-linear-gradient(top, #3cb0fd, #3498db);
+              background-image: linear-gradient(to bottom, #3cb0fd, #3498db);
+              text-decoration: none;
+              border: none !important;
+            }
+
+        </style>
+    </head>
+    <body>
+        
+        <button class="btn" id="clickme"> Click for Magic</button>
+        
+
+        <h2>Starting at Oct 3, 2015</h2>
+        <h2></h2>
+        <h2></h2>
+        <h2></h2>
+        <h2></h2>
+        <h2></h2>
+        <h2></h2>
+
+
+<script type="text/javascript">
+    var inputValue = null;
+  
+
+            //Width and height
+            var w = 1000;
+            var h = 600;
+            //Define map projection
+            var projection = d3.geo.albersUsa()
+                                   .translate([w/2, h/2])
+                                   .scale([1000]);
+            //Define path generator
+            var path = d3.geo.path()
+                             .projection(projection);
+                             
+            //Define quantize scale to sort data values into buckets of color
+            var color = d3.scale.quantize()
+                                .range(["rgb(237,248,233)","rgb(186,228,179)","rgb(116,196,118)","rgb(49,163,84)","rgb(0,109,44)"]);
+                                //Colors taken from colorbrewer.js, included in the D3 download
+            //Create SVG element
+            var svg = d3.select("body")
+                        .append("svg")
+                        .attr("width", w)
+                        .attr("height", h);
+            //Load in agriculture data
+            d3.csv("us-ag-productivity-2004.csv", function(data) {
+                //Set input domain for color scale
+                color.domain([
+                    d3.min(data, function(d) { return d.value; }), 
+                    d3.max(data, function(d) { return d.value; })
+                ]);
+            //Load in GeoJSON data
+                d3.json("states.json", function(json) {
+                    //Merge the ag. data and GeoJSON
+                    //Loop through once for each ag. data value
+                    for (var i = 0; i < data.length; i++) {
+                
+                        var dataState = data[i].state;              //Grab state name
+                        var dataValue = parseFloat(data[i].value);  //Grab data value, and convert from string to float
+                
+                        //Find the corresponding state inside the GeoJSON
+                        for (var j = 0; j < json.features.length; j++) {
+                        
+                            var jsonState = json.features[j].properties.name;
+                
+                            if (dataState == jsonState) {
+                        
+                                //Copy the data value into the JSON
+                                json.features[j].properties.value = dataValue;
+                                
+                                //Stop looking through the JSON
+                                break;
+                                
+                            }
+                        }       
+                    }
+                    //Bind data and create one path per GeoJSON feature
+                    svg.selectAll("path")
+                       .data(json.features)
+                       .enter()
+                       .append("path")
+                       .attr("d", path)
+                       .style("fill", function(d) {
+                            //Get data value
+                            var value = d.properties.value;
+                            
+                            if (value) {
+                                //If value exists…
+                            //    return color(value); // this is for ag data.  basically giving no special style to path
+                            } else {
+                                //If value is undefined…
+                                return "#ccc";
+                            }
+                       });
+                    //Load in cities data
+                    d3.csv("us-cities.csv", function(data) {
+                        
+                        svg.selectAll("circle") // creating circle element
+                           .data(data)
+                           .enter()
+                           .append("circle")
+                           .attr("cx", function(d) {
+                               return projection([d.lon, d.lat])[0]; //projections take in two values and return two values. Lat then long.  using data to find lon and lat.  
+                           })
+                           .attr("cy", function(d) {
+                               return projection([d.lon, d.lat])[1]; // call on the objects long property and returning the first index of it.
+                           })
+                           .attr("r", function(d) {
+                                return 0;
+                                //Math.sqrt(parseInt(d.population) * 1); // making circles with 1 radius for lat and long of us cities data.
+                           })
+                           //.attr("fill","yellow");
+                        });
+                }); // closes the state mapping
+
+
+                d3.select("#clickme").on("click", function() {
+
+                    d3.csv("month_1.csv", function(data) {
+                        
+                        svg.selectAll("circle") // creating circle element
+                           .data(data)
+                           .transition()
+                           .delay(function(d, i) { return i  * 30 })
+                           .each("start", function() {
+                             
+                            d3.select(this)
+                                .attr("fill", "black")
+                                .attr("r", function(d) {
+                                return 0 ; // making circles with 1 radius for lat and long of us cities data.
+                                })
+                            })
+                           .each("end", function() {        // <-- Executes at end of transition
+                           d3.select(this)
+                             .attr("fill", "magenta")
+                             .attr("r", function(d) {
+                                var radius = d.sqrt 
+                                return radius ; // making circles with 1 radius for lat and long of us cities data.
+                                })                             
+                            d3.csv("month_1.csv", function(data){
+                                for (var i = 0; i <data.length; i ++) {
+
+                                    var textinput = data[i].Submission
+                                    //d3.selectAll("h2").text(textinput)
+                                }
+                            })
+
+                          })
+                           
+                    })
+
+          
+            });
+             //closes event handler
+//Calendar Application
+
+
+
+   });   
+
+  
+            
+        </script>
+    </body>
+</html>
